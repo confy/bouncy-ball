@@ -17,11 +17,18 @@ import (
 var (
     WINDOW_WIDTH = unit.Dp(1000)
     WINDOW_HEIGHT = unit.Dp(1000)
-    BALL_COLOR = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
     BACKGROUND_COLOR = color.NRGBA{R: 16, G: 16, B: 16, A: 255}
-    CIRCLE_RADIUS = 80
+    
+    BALL_RADIUS = 80
+    BALL_COLOR = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+    
+    TRAIL_START_RADIUS = 25
+    TRAIL_COLOR = color.NRGBA{R: 0, G: 255, B: 255, A: 100}
+    TRAIL_MAX_LENGTH = 100
+
     GRAVITY = 0.2
     DAMPING = 0.95
+    ACCELERATION_DECAY = 0.99
 )
 
 func main() {
@@ -51,7 +58,6 @@ func (c *Circle) Draw(gtx *layout.Context) {
     }.Op(gtx.Ops)
     paint.FillShape(gtx.Ops, c.Color, circle)
 }
-
 
 
 type Ball struct {
@@ -99,6 +105,18 @@ func (b *Ball) handleCollision() {
     }
 }
 
+
+func drawTrail(gtx *layout.Context, trail []Circle) {
+    // Draw the trail
+    for i, c := range trail {
+        realIndex := len(trail) - i - 1
+        // Decrease the radius and alpha of the circle as it gets older
+        var decay float64 = 1 - (float64(realIndex) / float64(len(trail)))
+        c.Radius = int(float64(TRAIL_START_RADIUS) * decay)
+        c.Color.A = uint8(255 * decay)
+        c.Draw(gtx)
+    }
+}
 func draw(w *app.Window) error {
     // ops are the operations from the UI
     var ops op.Ops
@@ -107,18 +125,21 @@ func draw(w *app.Window) error {
         Circle: Circle{
             X: int(WINDOW_WIDTH) / 2,
             Y: int(WINDOW_HEIGHT) / 2,
-            Radius: CIRCLE_RADIUS,
+            Radius: BALL_RADIUS,
             Color: BALL_COLOR,
         },
-        VelocityX: 20,
-        VelocityY: 10,
-        AccelerationX: 1,
-        AccelerationY: 2,
+        VelocityX: 10,
+        VelocityY: 5,
+        AccelerationX: 0.1,
+        AccelerationY: 0.1,
     }
-    // trajectory
+
+    var trail []Circle
     for {
-        // listen for events
         switch e := w.Event().(type) {
+        // on close
+        case app.DestroyEvent:
+            return e.Err
 
         // this is sent when the application should re-render.
         case app.FrameEvent:
@@ -130,6 +151,20 @@ func draw(w *app.Window) error {
             // update ball
             ball.Update()
 
+            // add ball to trail
+            trail = append(trail, Circle{
+                X: ball.Circle.X,
+                Y: ball.Circle.Y,
+                Radius: TRAIL_START_RADIUS,
+                Color: TRAIL_COLOR,
+            })
+            if len(trail) > TRAIL_MAX_LENGTH {
+                trail = trail[1:]
+            }
+
+            // draw trail
+            drawTrail(&gtx, trail)
+
             // draw ball
             ball.Circle.Draw(&gtx)
 
@@ -138,10 +173,7 @@ func draw(w *app.Window) error {
 
             // Invalidate the window to request another frame, results in a FrameEvent
             w.Invalidate()
-        // on close
-        case app.DestroyEvent:
-            return e.Err
-        }
 
+        }
     }
 }

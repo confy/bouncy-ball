@@ -18,10 +18,10 @@ var (
     WINDOW_WIDTH = unit.Dp(1000)
     WINDOW_HEIGHT = unit.Dp(1000)
     BALL_COLOR = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-    BACKGROUND_COLOR = color.NRGBA{R: 40, G: 40, B: 40, A: 255}
+    BACKGROUND_COLOR = color.NRGBA{R: 16, G: 16, B: 16, A: 255}
     CIRCLE_RADIUS = 80
-    GRAVITY = 0.25
-    DAMPING = 0.8
+    GRAVITY = 0.2
+    DAMPING = 0.95
 )
 
 func main() {
@@ -39,42 +39,55 @@ func main() {
 }
 
 
-type Ball struct {
+type Circle struct {
     X, Y, Radius int
+    Color color.NRGBA
+}
+
+func (c *Circle) Draw(gtx *layout.Context) {
+    circle := clip.Ellipse{
+        Min: image.Pt(c.X-c.Radius, c.Y-c.Radius),
+        Max: image.Pt(c.X+c.Radius, c.Y+c.Radius),
+    }.Op(gtx.Ops)
+    paint.FillShape(gtx.Ops, c.Color, circle)
+}
+
+
+
+type Ball struct {
+    Circle Circle
     VelocityX, VelocityY float64
     AccelerationX, AccelerationY float64
 }
 
-func (b *Ball) Draw(gtx *layout.Context) {
-    circle := clip.Ellipse{
-        Min: image.Pt(b.X-b.Radius, b.Y-b.Radius),
-        Max: image.Pt(b.X+b.Radius, b.Y+b.Radius),
-    }.Op(gtx.Ops)
-    paint.FillShape(gtx.Ops, BALL_COLOR, circle)
-}
-
 func (b *Ball) Update() {
     b.VelocityY += GRAVITY
-    b.X += int(b.VelocityX)
-    b.Y += int(b.VelocityY)
+    b.Circle.X += int(b.VelocityX)
+    b.Circle.Y += int(b.VelocityY)
 
-    // Check for collision with the window bounds and invert velocity and acceleration if necessary
-    if b.X-b.Radius < 0 {
-        b.X = b.Radius
+    // Check for collision with the window bounds and handle it
+    b.handleCollision()
+}
+
+func (b *Ball) handleCollision() {
+    // Check for collision with the left and right bounds
+    if b.Circle.X-b.Circle.Radius < 0 {
+        b.Circle.X = b.Circle.Radius
         b.VelocityX = -b.VelocityX * DAMPING
         b.AccelerationX = -b.AccelerationX * DAMPING
-    } else if b.X+b.Radius > int(WINDOW_WIDTH) {
-        b.X = int(WINDOW_WIDTH) - b.Radius
+    } else if b.Circle.X+b.Circle.Radius > int(WINDOW_WIDTH) {
+        b.Circle.X = int(WINDOW_WIDTH) - b.Circle.Radius
         b.VelocityX = -b.VelocityX * DAMPING
         b.AccelerationX = -b.AccelerationX * DAMPING
     }
 
-    if b.Y-b.Radius < 0 {
-        b.Y = b.Radius
+    // Check for collision with the top and bottom bounds
+    if b.Circle.Y-b.Circle.Radius < 0 {
+        b.Circle.Y = b.Circle.Radius
         b.VelocityY = -b.VelocityY * DAMPING
         b.AccelerationY = -b.AccelerationY * DAMPING
-    } else if b.Y+b.Radius > int(WINDOW_HEIGHT) {
-        b.Y = int(WINDOW_HEIGHT) - b.Radius
+    } else if b.Circle.Y+b.Circle.Radius > int(WINDOW_HEIGHT) {
+        b.Circle.Y = int(WINDOW_HEIGHT) - b.Circle.Radius
         b.VelocityY = -b.VelocityY * DAMPING
         b.AccelerationY = -b.AccelerationY * DAMPING
     }
@@ -83,17 +96,20 @@ func (b *Ball) Update() {
 func draw(w *app.Window) error {
     // ops are the operations from the UI
     var ops op.Ops
-
-    ball := Ball{
-        X: int(WINDOW_WIDTH) / 2,
-        Y: int(WINDOW_HEIGHT) / 2,
-        Radius: CIRCLE_RADIUS,
-        VelocityX: 20,
-        VelocityY: 20,
-        AccelerationX: 2,
-        AccelerationY: 1,
-    }
     
+    ball := Ball{
+        Circle: Circle{
+            X: int(WINDOW_WIDTH) / 2,
+            Y: int(WINDOW_HEIGHT) / 2,
+            Radius: CIRCLE_RADIUS,
+            Color: BALL_COLOR,
+        },
+        VelocityX: 20,
+        VelocityY: 10,
+        AccelerationX: 1,
+        AccelerationY: 2,
+    }
+    // trajectory
     for {
         // listen for events
         switch e := w.Event().(type) {
@@ -109,7 +125,7 @@ func draw(w *app.Window) error {
             ball.Update()
 
             // draw ball
-            ball.Draw(&gtx)
+            ball.Circle.Draw(&gtx)
 
             // Draw the frame
             e.Frame(gtx.Ops)

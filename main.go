@@ -65,6 +65,12 @@ func (b *Ball) Update() {
     b.Circle.X += int(b.VelocityX)
     b.Circle.Y += int(b.VelocityY)
 
+    b.VelocityX += b.AccelerationX
+    b.VelocityY += b.AccelerationY
+
+    b.AccelerationX *= ACCELERATION_DECAY
+    b.AccelerationY *= ACCELERATION_DECAY
+
     // Check for collision with the window bounds and handle it
     b.handleCollision()
 }
